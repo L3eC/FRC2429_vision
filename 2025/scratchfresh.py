@@ -5,6 +5,7 @@ import json
 import numpy as np
 import time
 
+
 def main():
     with open('/boot/frc.json') as f:
         config = json.load(f)
@@ -12,10 +13,10 @@ def main():
     width = camera['width']
     height = camera['height']
     nt = ntcore.NetworkTableInstance.getDefault()
-    nt.startClient4("wpilibpi2024")
-    nt.setServerTeam(2429)
-    nt.startDSClient()
-    nt.setServer("192.168.68.69")
+    # nt.startClient4("wpilibpi2024")
+    # nt.setServerTeam(2429)
+    # nt.startDSClient()
+    nt.startServer()
     CameraServer.startAutomaticCapture()
     input_stream = CameraServer.getVideo()
     output_stream = CameraServer.putVideo('Processed', width, height)
