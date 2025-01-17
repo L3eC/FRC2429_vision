@@ -45,11 +45,12 @@ def main():
         _, contour_list = cv2.findContours(binary_img, mode=cv2.RETR_EXTERNAL, method=cv2.CHAIN_APPROX_SIMPLE)
         x_list = []
         y_list = []
+        output_stream.putFrame(binary_img)
 
         counter += 1
         print(f"counter is {counter}")
         nt.getEntry("SmartDashboard/counter").setInteger(counter)
-        counter_publisher.set(counter)
+        # counter_publisher.set(counter)
 
         # for contour in contour_list:
         #     # Ignore small contours that could be because of noise/bad thresholding
