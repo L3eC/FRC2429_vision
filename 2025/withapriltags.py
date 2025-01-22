@@ -73,40 +73,6 @@ def main():
         # print(f"shape of grayscale: {grayscale.shape}")
         detections = detector.detect(grayscale)
 
-        # if len(tags) > 0:
-        #     for tag in tags:
-        #         pose = pose_estimator.estimate(tag)
-        #         pose_camera = geo.Transform3d(
-        #             geo.Translation3d(pose.x, pose.y, pose.z),
-        #             geo.Rotation3d(-pose.rotation().x - np.pi, -pose.rotation().y, pose.rotation().z - np.pi))
-        #         pose_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(),
-        #                                                 geo.CoordinateSystem.NWU())
-        #         # where is camera on robot - origin of frame is center of robot
-        #         if front_cam:
-        #             # camera_in_robot_frame = geo.Transform3d(geo.Translation3d(0.3, 0, 0.2), geo.Rotation3d(0, 0, 0))  # front of robot
-        #             # the camera is in the front and four inches to the left of center
-        #             # also looks like a negative value on the y rotation gives the right distance
-        #             camera_y_rotation = -30  #  -30 seems to be what makes the distances most accurate statically, but it's not getting the ose right
-        #             camera_in_robot_frame = geo.Transform3d(geo.Translation3d(0.3, 0.05, 0.2),geo.Rotation3d(0, math.radians(camera_y_rotation), 0))  # back of robot, rotate up in y?
-        #         else:  # camera in back
-        #             # camera_in_robot_frame = geo.Transform3d(geo.Translation3d(0.3, 0, 0.2), geo.Rotation3d(0, 0, 0))  # front of robot
-        #             camera_y_rotation = -30  # -30 seems to be what makes the distances most accurate statically, but it's not getting the ose right
-        #             camera_in_robot_frame = geo.Transform3d(geo.Translation3d(-0.3, -.1, 0.2), geo.Rotation3d(0, math.radians(camera_y_rotation), np.pi))  # back of robot, rotate up in y?
-        #
-        #         tag_in_field_frame = layout.getTagPose(tag.getId())
-        #         try:
-        #             robot_in_field_frame = objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=pose_nwu, robotToCamera=camera_in_robot_frame)
-        #             rft = robot_in_field_frame.translation()
-        #             rfr = robot_in_field_frame.rotation()
-        #             tx, ty, tz = rft.x, rft.y, rft.z
-        #             rx, ry, rz = rfr.x, rfr.y, rfr.z
-        #             self.tags.update({f'tag{tag.getId():02d}': {'id': tag.getId(), 'rotation': pose.rotation().x, 'distance': pose.z,
-        #                                           'tx': tx, 'ty': ty, 'tz': tz, 'rx': rx, 'ry': ry, 'rz': rz}})
-        #         except Exception as e:
-        #             print(f'Attempted to get field frame but got error {e} on tag id {tag.getId()}')
-
-        # print(f"number of detections: {len(detections)}")
-
         poses = [pose_estimator.estimate(detection) for detection in detections]
 
         # list of robot poses as computed from each tag
@@ -122,15 +88,6 @@ def main():
 
             # OpenCV and WPILib estimator layout of axes is EDN and field WPILib is NWU; need x -> -y , y -> -z , z -> x and same for differential rotations
             transform_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(), geo.CoordinateSystem.NWU())
-            #print(pose_nwu)
-            # this may be buggy, according to OP, so try 
-            old = geo.CoordinateSystem.EDN()
-            new = geo.CoordinateSystem.NWU()
-
-            transform_nwu2 = geo.Transform3d(
-                geo.CoordinateSystem.convert(pose_camera.translation(), old, new),
-                geo.CoordinateSystem.convert(geo.Rotation3d(), new, old) + (geo.CoordinateSystem.convert(pose_camera.rotation(), old, new)),
-            )
 
             robot_to_camera_transform = geo.Transform3d(
                     geo.Translation3d(0.3, 0.15, 0.2),
@@ -140,7 +97,7 @@ def main():
             tag_in_field_frame = layout.getTagPose(7)
             # print(f"tag_in_field_frame: {tag_in_field_frame}")
             if tag_in_field_frame:
-                robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu2, robotToCamera=robot_to_camera_transform)
+                robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
                 robot_poses.append(robot_in_field_frame)
 
 
