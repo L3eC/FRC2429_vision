@@ -1,4 +1,4 @@
-from cscore import CameraServer
+from cscore import CameraServer, UsbCamera
 import cscore
 from cv2.gapi import video
 import ntcore
@@ -10,6 +10,7 @@ import time
 import robotpy_apriltag
 import wpimath
 import wpimath.geometry as geo
+from estimate_poses_from_apriltags import estimate_poses_from_apriltags
 
 front_cam = False
 # TODO: change for 2025 lol
@@ -38,7 +39,7 @@ def main():
     # video_camera.set
     camera = CameraServer.startAutomaticCapture()
     camera.setResolution(640, 360)
-    
+
     input_stream = CameraServer.getVideo()
     output_stream = CameraServer.putVideo('Processed', width, height)
 
@@ -68,40 +69,47 @@ def main():
 
         # ---------- START ACTUAL IMAGE PROCESSING ----------
 
-        # Convert to HSV and threshold image
-        grayscale = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)
-        # print(f"shape of grayscale: {grayscale.shape}")
-        detections = detector.detect(grayscale)
+        robot_to_camera_transform = geo.Transform3d(
+                geo.Translation3d(0.3, 0.15, 0.2),
+                geo.Rotation3d(0, math.radians(30), 0)
+        )
 
-        poses = [pose_estimator.estimate(detection) for detection in detections]
+        main_programs_robot_poses = estimate_poses_from_apriltags(image=input_img, pose_estimator=pose_estimator, robot_to_camera_transform=robot_to_camera_transform)
 
-        # list of robot poses as computed from each tag
-        robot_poses = []
+        # # Convert to HSV and threshold image
+        # grayscale = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)
+        # # print(f"shape of grayscale: {grayscale.shape}")
+        # detections = detector.detect(grayscale)
+        #
+        # poses = [pose_estimator.estimate(detection) for detection in detections]
+        #
+        # # list of robot poses as computed from each tag
+        # robot_poses = []
+        #
+        # for pose in poses:
+        #
+        #     # ngl idk why it's good to do these weird rotations but whatever
+        #     pose_camera = geo.Transform3d(
+        #             geo.Translation3d(pose.x, pose.y, pose.z),
+        #             geo.Rotation3d(-pose.rotation().x -np.pi, -pose.rotation().y, pose.rotation().z - np.pi)
+        #     )
+        #
+        #     # OpenCV and WPILib estimator layout of axes is EDN and field WPILib is NWU; need x -> -y , y -> -z , z -> x and same for differential rotations
+        #     transform_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(), geo.CoordinateSystem.NWU())
+        #
+        #     robot_to_camera_transform = geo.Transform3d(
+        #             geo.Translation3d(0.3, 0.15, 0.2),
+        #             geo.Rotation3d(0, math.radians(30), 0)
+        #     )
+        #
+        #     tag_in_field_frame = layout.getTagPose(7)
+        #     # print(f"tag_in_field_frame: {tag_in_field_frame}")
+        #     if tag_in_field_frame:
+        #         robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
+        #         robot_poses.append(robot_in_field_frame)
 
-        for pose in poses:
 
-            # ngl idk why it's good to do these weird rotations but whatever
-            pose_camera = geo.Transform3d(
-                    geo.Translation3d(pose.x, pose.y, pose.z),
-                    geo.Rotation3d(-pose.rotation().x -np.pi, -pose.rotation().y, pose.rotation().z - np.pi)
-            )
-
-            # OpenCV and WPILib estimator layout of axes is EDN and field WPILib is NWU; need x -> -y , y -> -z , z -> x and same for differential rotations
-            transform_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(), geo.CoordinateSystem.NWU())
-
-            robot_to_camera_transform = geo.Transform3d(
-                    geo.Translation3d(0.3, 0.15, 0.2),
-                    geo.Rotation3d(0, math.radians(30), 0)
-            )
-
-            tag_in_field_frame = layout.getTagPose(7)
-            # print(f"tag_in_field_frame: {tag_in_field_frame}")
-            if tag_in_field_frame:
-                robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
-                robot_poses.append(robot_in_field_frame)
-
-
-        for idx, pose in enumerate(robot_poses):
+        for idx, pose in enumerate(main_programs_robot_poses):
             nt.getEntry(f"SmartDashboard/pose {idx} idx x").setFloat(pose.X())
             nt.getEntry(f"SmartDashboard/pose {idx} idx y").setFloat(pose.Y())
             nt.getEntry(f"SmartDashboard/pose {idx} idx z").setFloat(pose.Z())
@@ -111,10 +119,10 @@ def main():
             # print(f"putting tag {idx} x AND seperately y AND z into smartdash")
 
 
-        counter += 1
-        # print(f"counter is {counter}")
-        nt.getEntry("SmartDashboard/counter").setInteger(counter)
+        # counter += 1
+        # # print(f"counter is {counter}")
+        # nt.getEntry("SmartDashboard/counter").setInteger(counter)
 
-        output_stream.putFrame(grayscale)
+        output_stream.putFrame(input_img)
 
 main()
