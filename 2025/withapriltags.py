@@ -44,10 +44,12 @@ def main():
     # program before uploading
     # LHACK 1/23/25
 
+    # if you want to see a specific camera on wpilibpi.local:1181, comment out everything relating to other cameras
+    # im sure there's a less janky way of doing it but idk what it is
+
     # at least we should probably populate this stuff from the frc.json
 
     c920 = UsbCamera("rear logitech c920", "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_EA3BCE4F-video-index0")
-    CameraServer.startAutomaticCapture(c920)
     c920_width = 640
     c920_height = 360
     c920.setResolution(c920_width, c920_height)
@@ -61,7 +63,6 @@ def main():
 
 
     lifecam = UsbCamera("test lifecam", "/dev/v4l/by-id/usb-Microsoft_Microsoft®_LifeCam_HD-3000-video-index0")
-    CameraServer.startAutomaticCapture(lifecam)
     lifecam_width = 640
     lifecam_height = 360
     lifecam.setResolution(lifecam_width, lifecam_height)
@@ -73,7 +74,14 @@ def main():
             geo.Rotation3d(0, 0, math.radians(-90))
     )
 
-    output_stream = CameraServer.putVideo('Processed', c920_width, c920_height)
+
+    # you get the adjustment sliders etc. on wpilibpi.local:1181 for the camera you call this on
+    CameraServer.startAutomaticCapture(lifecam)
+    
+
+    output_stream = CameraServer.putVideo('Processed', lifecam_width, lifecam_height)
+
+
 
     # Allocating new images is very expensive, always try to preallocate
     img = np.zeros(shape=(640, 360, 3), dtype=np.uint8)
@@ -83,6 +91,8 @@ def main():
     counter = 0
 
     while True:
+
+        start_time = time.time()
 
         robot_poses = []
 
@@ -100,8 +110,7 @@ def main():
         if lifecam_timestamp == 0:
             output_stream.notifyError(lifecam_image_provider.getError())
 
-        start_time = time.time()
-        output_img = np.copy(c920_image)
+        output_img = np.copy(lifecam_image)
 
         # Notify output of error and skip iteration
 
@@ -123,6 +132,6 @@ def main():
         # # print(f"counter is {counter}")
         # nt.getEntry("SmartDashboard/counter").setInteger(counter)
 
-        output_stream.putFrame(output_img)
+        output_stream.putFrame(lifecam_image)
 
 main()
