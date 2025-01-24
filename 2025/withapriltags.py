@@ -20,34 +20,60 @@ layout = robotpy_apriltag.AprilTagFieldLayout().loadField(robotpy_apriltag.April
 print(f"number of tags in the layout: {len(layout.getTags())}")
 
 def main():
-    with open('/boot/frc.json') as f:
-        config = json.load(f)
-    camera_info_dict = config['cameras'][0]
-    print(f"camera: {camera_info_dict}")
-    width = camera_info_dict['width']
-    height = camera_info_dict['height']
+
 
     nt = ntcore.NetworkTableInstance.getDefault()
     nt.startClient4("wpilibpi2024")
     nt.setServerTeam(2429)
     nt.startDSClient()
 
-    # Table for vision output information TODO: don't use these, just use getEntry.set...()
-    smartdash_table = nt.getTable('SmartDashboard')
-    counter_publisher = smartdash_table.getIntegerTopic("counter").publish()
+    with open('/boot/frc.json') as f:
+        config = json.load(f)
+    camera_info_dict = config['cameras'][1]
+    print(f"camera: {camera_info_dict}")
+    width = camera_info_dict['width']
+    height = camera_info_dict['height']
 
-    # video_camera.set
-    camera = CameraServer.startAutomaticCapture()
-    camera.setResolution(640, 360)
 
-    input_stream = CameraServer.getVideo()
-    output_stream = CameraServer.putVideo('Processed', width, height)
+    # --------- per camera stuff here ----------
+    # not sure this is the best way- maybe make a class or a dictionary?
+    # but that's less explicit and more difficult to understand; and this whole rewrite is to
+    # make the code easier to understand, and we'll have to type all this anyways.
+    # but this is more annoying to change per pi
+    # i think we should have different programs per pi anyways so we don't need to know the state of our "main"
+    # program before uploading
+    # LHACK 1/23/25
 
-    detector = robotpy_apriltag.AprilTagDetector()
-    detector.addFamily("tag36h11")
-    
-    estimator_config = robotpy_apriltag.AprilTagPoseEstimator.Config(tagSize=0.1651, fx=478, fy=478, cx=640 / 2, cy=360 / 2)  # logitech at 640x360
-    pose_estimator = robotpy_apriltag.AprilTagPoseEstimator(estimator_config)
+    # at least we should probably populate this stuff from the frc.json
+
+    c920 = UsbCamera("rear logitech c920", "/dev/v4l/by-id/usb-046d_HD_Pro_Webcam_C920_EA3BCE4F-video-index0")
+    CameraServer.startAutomaticCapture(c920)
+    c920_width = 640
+    c920_height = 360
+    c920.setResolution(c920_width, c920_height)
+    c920_image_provider = CameraServer.getVideo(c920)
+    c920_estimator_config = robotpy_apriltag.AprilTagPoseEstimator.Config(tagSize=0.1651, fx=478, fy=478, cx=640 / 2, cy=360 / 2)  # logitech at 640x360
+    c920_pose_estimator = robotpy_apriltag.AprilTagPoseEstimator(c920_estimator_config)
+    c920_robot_to_camera_transform = geo.Transform3d(
+            geo.Translation3d(0.3, 0.15, 0.2),
+            geo.Rotation3d(0, math.radians(30), 0)
+    )
+
+
+    lifecam = UsbCamera("test lifecam", "/dev/v4l/by-id/usb-Microsoft_Microsoft®_LifeCam_HD-3000-video-index0")
+    CameraServer.startAutomaticCapture(lifecam)
+    lifecam_width = 640
+    lifecam_height = 360
+    lifecam.setResolution(lifecam_width, lifecam_height)
+    lifecam_image_provider = CameraServer.getVideo(lifecam)
+    lifecam_estimator_config = robotpy_apriltag.AprilTagPoseEstimator.Config(tagSize=0.1651, fx=478, fy=478, cx=640 / 2, cy=360 / 2)  # logitech at 640x360
+    lifecam_pose_estimator = robotpy_apriltag.AprilTagPoseEstimator(lifecam_estimator_config)
+    lifecam_robot_to_camera_transform = geo.Transform3d(
+            geo.Translation3d(0, 0.3, 0.2),
+            geo.Rotation3d(0, 0, math.radians(-90))
+    )
+
+    output_stream = CameraServer.putVideo('Processed', c920_width, c920_height)
 
     # Allocating new images is very expensive, always try to preallocate
     img = np.zeros(shape=(640, 360, 3), dtype=np.uint8)
@@ -58,64 +84,38 @@ def main():
 
     while True:
 
+        robot_poses = []
+
+        c920_timestamp, c920_image = c920_image_provider.grabFrame(img)
+        robot_poses += estimate_poses_from_apriltags(c920_image, c920_pose_estimator, c920_robot_to_camera_transform)
+
+        if c920_timestamp == 0:
+            output_stream.notifyError(c920_image_provider.getError())
+            continue
+
+
+        lifecam_timestamp, lifecam_image = lifecam_image_provider.grabFrame(img)
+        robot_poses += estimate_poses_from_apriltags(lifecam_image, lifecam_pose_estimator, lifecam_robot_to_camera_transform)
+
+        if lifecam_timestamp == 0:
+            output_stream.notifyError(lifecam_image_provider.getError())
+
         start_time = time.time()
-        frame_time, input_img = input_stream.grabFrame(img)
-        output_img = np.copy(input_img)
+        output_img = np.copy(c920_image)
 
         # Notify output of error and skip iteration
-        if frame_time == 0:
-            output_stream.notifyError(input_stream.getError())
-            continue
+
 
         # ---------- START ACTUAL IMAGE PROCESSING ----------
 
-        robot_to_camera_transform = geo.Transform3d(
-                geo.Translation3d(0.3, 0.15, 0.2),
-                geo.Rotation3d(0, math.radians(30), 0)
-        )
 
-        main_programs_robot_poses = estimate_poses_from_apriltags(image=input_img, pose_estimator=pose_estimator, robot_to_camera_transform=robot_to_camera_transform)
-
-        # # Convert to HSV and threshold image
-        # grayscale = cv2.cvtColor(input_img, cv2.COLOR_BGR2GRAY)
-        # # print(f"shape of grayscale: {grayscale.shape}")
-        # detections = detector.detect(grayscale)
-        #
-        # poses = [pose_estimator.estimate(detection) for detection in detections]
-        #
-        # # list of robot poses as computed from each tag
-        # robot_poses = []
-        #
-        # for pose in poses:
-        #
-        #     # ngl idk why it's good to do these weird rotations but whatever
-        #     pose_camera = geo.Transform3d(
-        #             geo.Translation3d(pose.x, pose.y, pose.z),
-        #             geo.Rotation3d(-pose.rotation().x -np.pi, -pose.rotation().y, pose.rotation().z - np.pi)
-        #     )
-        #
-        #     # OpenCV and WPILib estimator layout of axes is EDN and field WPILib is NWU; need x -> -y , y -> -z , z -> x and same for differential rotations
-        #     transform_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(), geo.CoordinateSystem.NWU())
-        #
-        #     robot_to_camera_transform = geo.Transform3d(
-        #             geo.Translation3d(0.3, 0.15, 0.2),
-        #             geo.Rotation3d(0, math.radians(30), 0)
-        #     )
-        #
-        #     tag_in_field_frame = layout.getTagPose(7)
-        #     # print(f"tag_in_field_frame: {tag_in_field_frame}")
-        #     if tag_in_field_frame:
-        #         robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
-        #         robot_poses.append(robot_in_field_frame)
-
-
-        for idx, pose in enumerate(main_programs_robot_poses):
+        for idx, pose in enumerate(robot_poses):
             nt.getEntry(f"SmartDashboard/pose {idx} idx x").setFloat(pose.X())
             nt.getEntry(f"SmartDashboard/pose {idx} idx y").setFloat(pose.Y())
             nt.getEntry(f"SmartDashboard/pose {idx} idx z").setFloat(pose.Z())
-            nt.getEntry(f"SmartDashboard/pose {idx} idx x rot").setFloat(pose.rotation().x_degrees)
-            nt.getEntry(f"SmartDashboard/pose {idx} idx y rot").setFloat(pose.rotation().y_degrees)
-            nt.getEntry(f"SmartDashboard/pose {idx} idx z rot").setFloat(pose.rotation().z_degrees)
+            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().x_degrees)
+            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().y_degrees)
+            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().z_degrees)
             # print(f"putting tag {idx} x AND seperately y AND z into smartdash")
 
 
@@ -123,6 +123,6 @@ def main():
         # # print(f"counter is {counter}")
         # nt.getEntry("SmartDashboard/counter").setInteger(counter)
 
-        output_stream.putFrame(input_img)
+        output_stream.putFrame(output_img)
 
 main()

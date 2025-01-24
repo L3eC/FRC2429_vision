@@ -11,11 +11,14 @@ layout = robotpy_apriltag.AprilTagFieldLayout().loadField(robotpy_apriltag.April
 detector = robotpy_apriltag.AprilTagDetector()
 detector.addFamily("tag36h11")
 
-def estimate_poses_from_apriltags(image: np.ndarray, pose_estimator: robotpy_apriltag.AprilTagPoseEstimator, robot_to_camera_transform: geo.Transform3d) -> List[geo.Pose2d]:
+def estimate_poses_from_apriltags(image: np.ndarray, pose_estimator: robotpy_apriltag.AprilTagPoseEstimator, 
+                                  robot_to_camera_transform: geo.Transform3d) -> List[geo.Pose2d]:
 
     """
-    Given an image, a pose estimator, and the position of the camera on the robot, returns a list of robot poses, one for each apriltag.
-    The function needs a pose estimator because the pose estimator is constructed with lens intrinsics, which change per camera and therefore cannot be hardcoded.
+    Given an image, a pose estimator, and the position of the camera on the robot, 
+    returns a list of robot poses, one for each apriltag.
+    The function needs a pose estimator because the pose estimator is constructed with lens intrinsics, 
+    which change per camera and therefore cannot be hardcoded into the function.
     """
 
     grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
@@ -43,14 +46,5 @@ def estimate_poses_from_apriltags(image: np.ndarray, pose_estimator: robotpy_apr
         if tag_in_field_frame:
             robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
             robot_poses.append(robot_in_field_frame)
-
-
-    # for idx, pose in enumerate(robot_poses):
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx x").setFloat(pose.X())
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx y").setFloat(pose.Y())
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx z").setFloat(pose.Z())
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx x rot").setFloat(pose.rotation().x_degrees)
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx y rot").setFloat(pose.rotation().y_degrees)
-    #     nt.getEntry(f"SmartDashboard/pose {idx} idx z rot").setFloat(pose.rotation().z_degrees)
 
     return robot_poses
