@@ -4,6 +4,7 @@ import cv2
 import robotpy_apriltag
 import wpimath.geometry as geo
 import wpimath
+from blockhead_camera import BlockheadCamera
 
 # stuff which is needed and the same for every camera.
 # stuff which changes with different cameras should be passed to estimate_poses_from_apriltag as a parameter.
@@ -11,25 +12,26 @@ layout = robotpy_apriltag.AprilTagFieldLayout().loadField(robotpy_apriltag.April
 detector = robotpy_apriltag.AprilTagDetector()
 detector.addFamily("tag36h11")
 
-def estimate_poses_from_apriltags(image: np.ndarray, pose_estimator: robotpy_apriltag.AprilTagPoseEstimator, 
-                                  robot_to_camera_transform: geo.Transform3d) -> List[geo.Pose2d]:
+def find_robot_pose_from_apriltags_pipeline(blockhead_camera: BlockheadCamera) -> List[geo.Pose2d]:
 
     """
-    Given an image, a pose estimator, and the position of the camera on the robot, 
+    Given a BlockheadCamera
     returns a list of robot poses, one for each apriltag.
     The function needs a pose estimator because the pose estimator is constructed with lens intrinsics, 
     which change per camera and therefore cannot be hardcoded into the function.
     """
 
+    robot_to_camera_transform = blockhead_camera.get_robot_to_camera_transform()
+
+    timestamp, image = blockhead_camera.get_image()
+
     grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     detections = detector.detect(grayscale)
 
-    poses = [pose_estimator.estimate(detection) for detection in detections]
+    poses = [blockhead_camera.get_pose_estimator().estimate(detection) for detection in detections]
 
-    # list of robot poses as computed from each tag
-    robot_poses = []
-
+    robot_poses = [] # list of robot poses as computed from each tag
     for pose in poses:
 
         # ngl idk why it's good to do these weird rotations but whatever

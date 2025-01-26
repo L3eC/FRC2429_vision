@@ -1,0 +1,37 @@
+{
+	"rear logitech c920": {
+		"note": "the key of each camera (here, rear logitech c920) should match its name as defined in frc.json",
+		"tag_size": 0.1651,
+		"fx": 478,
+		"fy": 478,
+		"cx": 320,
+		"cy": 180,
+		"transform": {
+			"x_meters": 0.3,
+			"y_meters": 0.15,
+			"z_meters": 0.2,
+			"x_rot_degrees": 0,
+			"y_rot_degrees": 30,
+			"z_rot_degrees": 0
+		},
+
+		"pipelines": ["estimate_poses_from_apriltags", "example_pose"]
+	},
+
+	"test lifecam": {
+		"tag_size": 0.1651,
+		"fx": 342.3,
+		"fy": 335.1,
+		"cx": 160,
+		"cy": 120,
+		"transform": {
+			"x_meters": 0,
+			"y_meters": 0.3,
+			"z_meters": 0.2,
+			"x_rot_degrees": 0,
+			"y_rot_degrees": 0,
+			"z_rot_degrees": -90
+		},
+		"pipelines": ["estimate_poses_from_apriltags", "annotate_image_pipeline"]
+	}
+}
