@@ -12,7 +12,7 @@ layout = robotpy_apriltag.AprilTagFieldLayout().loadField(robotpy_apriltag.April
 detector = robotpy_apriltag.AprilTagDetector()
 detector.addFamily("tag36h11")
 
-def find_robot_pose_from_apriltags_pipeline(blockhead_camera: BlockheadCamera) -> List[geo.Pose2d]:
+def pipeline_find_robot_pose_from_apriltags(blockhead_camera: BlockheadCamera) -> List[geo.Pose2d]:
 
     """
     Given a BlockheadCamera

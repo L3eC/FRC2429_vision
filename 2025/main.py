@@ -4,8 +4,8 @@ from cscore import CameraServer
 import ntcore
 import json
 import time
-from pipelines.find_robot_pose_from_apriltags_pipeline import find_robot_pose_from_apriltags_pipeline
-from pipelines.annotate_image_pipeline import annotate_image_pipeline
+from pipeline_find_robot_pose_from_apriltags import pipeline_find_robot_pose_from_apriltags
+from pipeline_annotate_image import pipeline_annotate_image
 from blockhead_camera import BlockheadCamera
 
 def main():
@@ -18,7 +18,7 @@ def main():
     nt.setServerTeam(2429)
     nt.startDSClient()
 
-    with open('2024compfrc.json') as f:
+    with open('/boot/frc.json') as f:
         frc_json = json.load(f) # a config provided by wpilib tools, basically. Includes stuff necessary for interfacing with the camera itself, as well as camera settings.
 
     with open('extra_camera_info.json') as j:
@@ -66,11 +66,11 @@ def main():
             this_camera_pipeline_names = blockhead_camera.get_extra_info_dict()['pipelines']
 
             # Pass this camera to every pipeline we want it to be passed to.
-            if 'find_robot_pose_from_apriltags_pipeline' in this_camera_pipeline_names:
-                robot_poses += find_robot_pose_from_apriltags_pipeline(blockhead_camera)
+            if 'pipeline_find_robot_pose_from_apriltags' in this_camera_pipeline_names:
+                robot_poses += pipeline_find_robot_pose_from_apriltags(blockhead_camera)
 
-            if 'annotate_image_pipeline' in this_camera_pipeline_names:
-                output_image = annotate_image_pipeline(blockhead_camera)
+            if 'pipeline_annotate_image' in this_camera_pipeline_names:
+                output_image = pipeline_annotate_image(blockhead_camera)
 
         for idx, pose in enumerate(robot_poses):
             nt.getEntry(f"SmartDashboard/pose {idx} idx x").setFloat(pose.X())

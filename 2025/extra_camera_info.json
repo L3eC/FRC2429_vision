@@ -15,7 +15,7 @@
 			"z_rot_degrees": 0
 		},
 
-		"pipelines": ["estimate_poses_from_apriltags", "example_pose"]
+		"pipelines": ["pipeline_find_robot_pose_from_apriltags", "example_pipeline"]
 	},
 
 	"test lifecam": {
@@ -32,6 +32,6 @@
 			"y_rot_degrees": 0,
 			"z_rot_degrees": -90
 		},
-		"pipelines": ["estimate_poses_from_apriltags", "annotate_image_pipeline"]
+		"pipelines": ["pipeline_find_robot_pose_from_apriltags", "pipeline_annotate_image"]
 	}
 }
