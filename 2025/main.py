@@ -1,29 +1,43 @@
+import os
 from typing import Dict
 import numpy as np
 from cscore import CameraServer
 import ntcore
 import json
 import time
-from pipeline_find_robot_pose_from_apriltags import pipeline_find_robot_pose_from_apriltags
-from pipeline_annotate_image import pipeline_annotate_image
+
 from blockhead_camera import BlockheadCamera
+
+from pipeline_handle_apriltags import pipeline_handle_apriltags
+from pipeline_annotate_image import pipeline_annotate_image
 
 def main():
 
     print('main started successfully')
-
-    # start networktables
-    nt = ntcore.NetworkTableInstance.getDefault()
-    nt.startClient4("wpilibpi2024")
-    nt.setServerTeam(2429)
-    nt.startDSClient()
 
     with open('/boot/frc.json') as f:
         frc_json = json.load(f) # a config provided by wpilib tools, basically. Includes stuff necessary for interfacing with the camera itself, as well as camera settings.
 
     with open('extra_camera_info.json') as j:
         extra_camera_info_json = json.load(j) # a config file where we specify our own things for each camera. 
-                                              # we don't merge this with the main config because the main config is annoying to edit.
+
+    found_pi_info = False
+    filenames_in_home_directory = os.listdir('/home/pi')
+    for filename in filenames_in_home_directory:
+        if 'extra_pi_info' in filename:
+            with open(filename) as k:
+                extra_pi_info_json = json.load(k)
+                found_pi_info = True
+                this_pi_name = extra_pi_info_json["name"] # we need this for nt
+
+    if not found_pi_info:
+        raise FileNotFoundError("Could not find info for this pi!")
+
+    # start networktables
+    nt = ntcore.NetworkTableInstance.getDefault()
+    nt.startClient4(this_pi_name)
+    nt.setServerTeam(2429)
+    nt.startDSClient()
 
     # dictionary to hold BlockheadCameras (see the class)
     blockhead_cameras: Dict[str, BlockheadCamera] = {}
@@ -39,12 +53,14 @@ def main():
 
 
     # you get the adjustment sliders etc. on wpilibpi.local:1181 for the UsbCamera you call this on
+    # TODO: try calling this on all our blockheadcameras and seeing if they show up on wpilibpi.local/118n where n > 1
     CameraServer.startAutomaticCapture(blockhead_cameras['rear logitech c920'].get_usb_camera())
     
     # idk what we want to send as the output
     # for now we use a a placeholder pipeline that returns an annotated image
     output_width = blockhead_cameras['rear logitech c920'].get_frc_json()['width']
     output_height = blockhead_cameras['rear logitech c920'].get_frc_json()['height']
+    # TODO: try making several output streams and seeing if they go onto wpilibpi.local/118n where n > 1
     output_stream = CameraServer.putVideo('Processed', output_width, output_height)
     output_image = np.zeros(shape=(output_width, output_height), dtype=np.uint8)
 
@@ -57,7 +73,8 @@ def main():
 
         # ---------- START ACTUAL IMAGE PROCESSING ----------
 
-        robot_poses = []
+        robot_pose_info = []
+        tag_rightnesses = {}
 
         for blockhead_camera in blockhead_cameras.values(): # run the proper pipelines for each camera
 
@@ -67,18 +84,21 @@ def main():
 
             # Pass this camera to every pipeline we want it to be passed to.
             if 'pipeline_find_robot_pose_from_apriltags' in this_camera_pipeline_names:
-                robot_poses += pipeline_find_robot_pose_from_apriltags(blockhead_camera)
+
+                this_camera_robot_pose_info, this_camera_rightnesses = pipeline_handle_apriltags(blockhead_camera)
+
+                robot_pose_info += this_camera_robot_pose_info
+                tag_rightnesses.update(this_camera_rightnesses)
 
             if 'pipeline_annotate_image' in this_camera_pipeline_names:
                 output_image = pipeline_annotate_image(blockhead_camera)
 
-        for idx, pose in enumerate(robot_poses):
-            nt.getEntry(f"SmartDashboard/pose {idx} idx x").setFloat(pose.X())
-            nt.getEntry(f"SmartDashboard/pose {idx} idx y").setFloat(pose.Y())
-            nt.getEntry(f"SmartDashboard/pose {idx} idx z").setFloat(pose.Z())
-            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().x_degrees)
-            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().y_degrees)
-            nt.getEntry(f"SmartDashboard/pose {idx} idx rot").setFloat(pose.rotation().z_degrees)
+        # ------------------- TRANSMIT RESULTS ----------------
+
+        nt.getEntry(f"vision/{this_pi_name}/robot_pose_info").setFloatArray(robot_pose_info)
+
+        for id, rightness in tag_rightnesses.items():
+            nt.getEntry(f"vision/{this_pi_name}/rightnesses/id {id}").setFloat(rightness)
 
         output_stream.putFrame(output_image)
 
