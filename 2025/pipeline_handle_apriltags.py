@@ -16,9 +16,13 @@ def pipeline_handle_apriltags(blockhead_camera: BlockheadCamera) -> Tuple[List[f
 
     """
     Given a BlockheadCamera, returns a tuple of a list and a dict.
-    this list has 4*n floats (n is an integer), where each 4-float chunk represents the robot pose as computed from one tag. Each chunk is of the form [timestamp, robot x, robot y, robot yaw].
-    the dictionary tag ids for keys, and their rightnesses for values (where -1 is all the way on the right of the image and 1 is all the way on the left)
-    The function needs a pose estimator because the pose estimator is constructed with lens intrinsics, 
+    this list has 4*n floats (n is an integer), 
+    where each 4-float chunk represents the robot pose as computed from one tag. 
+    Each chunk is of the form [timestamp, robot x, robot y, robot yaw].
+    the dictionary has tag ids for keys, and their "rightnesses" for values 
+    (where -1 rightness is all the way on the left of the image and 1 is all the way on the right)
+    The function needs a pose estimator because the pose 
+    estimator is constructed with lens intrinsics, 
     which change per camera and therefore cannot be hardcoded into the function.
     """
 

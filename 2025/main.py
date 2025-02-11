@@ -102,4 +102,9 @@ def main():
 
         output_stream.putFrame(output_image)
 
+        nt.getEntry(f"vision/{this_pi_name}/wpinow_time").setFloat(ntcore._now())  # https://www.chiefdelphi.com/t/synchronizing-cvsink-timestamp/
+                                                                                   # basically we transmit this, then the robot figures out what wpi::Now() time
+                                                                                   # is equivalent to its own time, then from there the robot can translate the apriltags'
+                                                                                   # timestamps into its own time.
+
 main()
