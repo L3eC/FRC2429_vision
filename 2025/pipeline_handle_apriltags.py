@@ -1,3 +1,4 @@
+import math
 from typing import Dict, List, Tuple
 import numpy as np
 import cv2
@@ -12,7 +13,7 @@ layout = robotpy_apriltag.AprilTagFieldLayout().loadField(robotpy_apriltag.April
 detector = robotpy_apriltag.AprilTagDetector()
 detector.addFamily("tag36h11")
 
-def pipeline_handle_apriltags(blockhead_camera: BlockheadCamera) -> Tuple[List[float], Dict[int, float]]:
+def pipeline_handle_apriltags(blockhead_camera: BlockheadCamera) -> Tuple[List[float], Dict[int, Tuple[float, float]]]:
 
     """
     Given a BlockheadCamera, returns a tuple of a list and a dict.
@@ -33,19 +34,13 @@ def pipeline_handle_apriltags(blockhead_camera: BlockheadCamera) -> Tuple[List[f
     grayscale = cv2.cvtColor(image, cv2.COLOR_BGR2GRAY)
 
     detections = detector.detect(grayscale)
-    
-    normalized_rightnesses = {}
+
+    tag_vector_dict = {} # vectors from camera to tag, stored in polar coords
+    robot_pose_info = []
+
     for detection in detections:
-        normalized_rightness = detections[0].getCenter().x - blockhead_camera.get_frc_json()['width'] / 2 # get it and make 0 the center
-        normalized_rightness /= blockhead_camera.get_frc_json()['width'] / 2 # normalize it
-        normalized_rightnesses.update({detection.getId(): normalized_rightness})
 
-    ids_poses = {detection.getId(): blockhead_camera.get_pose_estimator().estimate(detection) for detection in detections}
-
-    robot_pose_info = [] # list of robot poses as computed from each tag, with timestamps
-                         # each tag takes up 4 items: timestamp, x, y, and rot
-
-    for id, pose in ids_poses.items():
+        pose = blockhead_camera.get_pose_estimator().estimate(detection)
 
         # ngl idk why we need to do these weird rotations but whatever
         pose_camera = geo.Transform3d(
@@ -56,14 +51,27 @@ def pipeline_handle_apriltags(blockhead_camera: BlockheadCamera) -> Tuple[List[f
         # OpenCV and WPILib estimator layout of axes is EDN and field WPILib is NWU; need x -> -y , y -> -z , z -> x and same for differential rotations
         transform_nwu = geo.CoordinateSystem.convert(pose_camera, geo.CoordinateSystem.EDN(), geo.CoordinateSystem.NWU())
 
-        tag_in_field_frame = layout.getTagPose(id)
+        tag_in_field_frame = layout.getTagPose(detection.getId())
 
         if tag_in_field_frame:
 
             robot_in_field_frame = wpimath.objectToRobotPose(objectInField=tag_in_field_frame, cameraToObject=transform_nwu, robotToCamera=robot_to_camera_transform)
-            
+
             this_tag_info = [timestamp, robot_in_field_frame.X(), robot_in_field_frame.Y(), robot_in_field_frame.rotation().Z()]
 
             robot_pose_info += this_tag_info
 
-    return (robot_pose_info, normalized_rightnesses)
+        # cx is the "center" of the image in pixel coords
+        zero_centered_x = detection.getCenter().x - blockhead_camera.get_extra_info_dict()['cx']
+
+        # this is the angle between a vector shooting straight out of the camera, and the vector from the camera to the object.
+        # as the object moves clockwise, the angle decreases (conforming with the usual system)
+        # negative sign in front of zero_centered_x because as the pixel's x coordinate increases, the object moves clockwise relative to us
+        # but atan expects an increase in its first argument to result in an increase in the angle.
+        tag_angle_from_camera_forward = math.atan2(-zero_centered_x, blockhead_camera.get_extra_info_dict()['fx'])
+
+        distance_to_tag = geo.Translation2d(transform_nwu.x, transform_nwu.y).norm()
+
+        tag_vector_dict.update({detection.getId(): (distance_to_tag, tag_angle_from_camera_forward)})
+
+    return (robot_pose_info, tag_vector_dict)

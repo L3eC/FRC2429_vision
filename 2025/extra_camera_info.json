@@ -1,6 +1,6 @@
 {
 	"rear logitech c920": {
-		"note": "the key of each camera (here, rear logitech c920) should match its name as defined in frc.json",
+		"note": "the key of each camera (here, rear logitech c920) should match its name as defined in frc.json, and must be unique across every camera.",
 		"tag_size": 0.1651,
 		"fx": 478,
 		"fy": 478,

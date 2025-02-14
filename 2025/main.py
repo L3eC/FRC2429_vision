@@ -15,29 +15,30 @@ def main():
 
     print('main started successfully')
 
-    with open('/boot/frc.json') as f:
-        frc_json = json.load(f) # a config provided by wpilib tools, basically. Includes stuff necessary for interfacing with the camera itself, as well as camera settings.
-
-    with open('extra_camera_info.json') as j:
-        extra_camera_info_json = json.load(j) # a config file where we specify our own things for each camera. 
-
-    found_pi_info = False
+    found_pi_infos = 0
     filenames_in_home_directory = os.listdir('/home/pi')
     for filename in filenames_in_home_directory:
         if 'extra_pi_info' in filename:
             with open(filename) as k:
                 extra_pi_info_json = json.load(k)
-                found_pi_info = True
+                found_pi_infos += 1
                 this_pi_name = extra_pi_info_json["name"] # we need this for nt
 
-    if not found_pi_info:
-        raise FileNotFoundError("Could not find info for this pi!")
+    if found_pi_infos != 1:
+        raise FileNotFoundError("Found either no or more than one pi info!")
 
     # start networktables
     nt = ntcore.NetworkTableInstance.getDefault()
     nt.startClient4(this_pi_name)
     nt.setServerTeam(2429)
     nt.startDSClient()
+
+    with open('/boot/frc.json') as f:
+        frc_json = json.load(f) # a config provided by wpilib tools, basically. Includes stuff necessary for interfacing with the camera itself, as well as camera settings.
+
+    with open('extra_camera_info.json') as j:
+        extra_camera_info_json = json.load(j) # a config file where we specify our own things for each camera. 
+        nt.getEntry(f"vision/{this_pi_name}/extra_camera_info_json").setString(j.read())
 
     # dictionary to hold BlockheadCameras (see the class)
     blockhead_cameras: Dict[str, BlockheadCamera] = {}
@@ -74,7 +75,7 @@ def main():
         # ---------- START ACTUAL IMAGE PROCESSING ----------
 
         robot_pose_info = []
-        tag_rightnesses = {}
+        tag_vectors = {} # vectors from camera to apriltag, with camera as origin
 
         for blockhead_camera in blockhead_cameras.values(): # run the proper pipelines for each camera
 
@@ -85,10 +86,10 @@ def main():
             # Pass this camera to every pipeline we want it to be passed to.
             if 'pipeline_find_robot_pose_from_apriltags' in this_camera_pipeline_names:
 
-                this_camera_robot_pose_info, this_camera_rightnesses = pipeline_handle_apriltags(blockhead_camera)
+                this_camera_robot_pose_info, this_camera_tag_vectors = pipeline_handle_apriltags(blockhead_camera)
 
                 robot_pose_info += this_camera_robot_pose_info
-                tag_rightnesses.update(this_camera_rightnesses)
+                tag_vectors.update(this_camera_tag_vectors)
 
             if 'pipeline_annotate_image' in this_camera_pipeline_names:
                 output_image = pipeline_annotate_image(blockhead_camera)
@@ -97,8 +98,9 @@ def main():
 
         nt.getEntry(f"vision/{this_pi_name}/robot_pose_info").setFloatArray(robot_pose_info)
 
-        for id, rightness in tag_rightnesses.items():
-            nt.getEntry(f"vision/{this_pi_name}/rightnesses/id {id}").setFloat(rightness)
+        for id, vector in tag_vectors.items():
+            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} magnitude").setFloat(vector[0])
+            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} angle").setFloat(vector[1])
 
         output_stream.putFrame(output_image)
 
