@@ -23,6 +23,7 @@ def main():
                 extra_pi_info_json = json.load(k)
                 found_pi_infos += 1
                 this_pi_name = extra_pi_info_json["name"] # we need this for nt
+                print("Found extra pi info json!")
 
     if found_pi_infos != 1:
         raise FileNotFoundError("Found either no or more than one pi info!")
@@ -35,10 +36,12 @@ def main():
 
     with open('/boot/frc.json') as f:
         frc_json = json.load(f) # a config provided by wpilib tools, basically. Includes stuff necessary for interfacing with the camera itself, as well as camera settings.
+        print("Found frc.json!")
 
     with open('extra_camera_info.json') as j:
         extra_camera_info_json = json.load(j) # a config file where we specify our own things for each camera. 
         nt.getEntry(f"vision/{this_pi_name}/extra_camera_info_json").setString(j.read())
+        print("Found extra camera info!")
 
     # dictionary to hold BlockheadCameras (see the class)
     blockhead_cameras: Dict[str, BlockheadCamera] = {}
@@ -96,15 +99,20 @@ def main():
 
         # ------------------- TRANSMIT RESULTS ----------------
 
-        nt.getEntry(f"vision/{this_pi_name}/robot_pose_info").setFloatArray(robot_pose_info)
+        print(f"robot pose info: {robot_pose_info}")
+        print(f"len robot pose info: {len(robot_pose_info)}")
+        # note: don't use floats. they mysteriously don't work sometimes LHACK 2/14/25
+        nt.getEntry(f"vision/{this_pi_name}/robot_pose_info").setDoubleArray(robot_pose_info)
+
+        nt.getEntry(f"vision/{this_pi_name}/len robot pose info").setInteger(len(robot_pose_info))
 
         for id, vector in tag_vectors.items():
-            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} magnitude").setFloat(vector[0])
-            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} angle").setFloat(vector[1])
+            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} magnitude").setDouble(vector[0])
+            nt.getEntry(f"vision/{this_pi_name}/tag_vectors/id {id} angle").setDouble(vector[1])
 
         output_stream.putFrame(output_image)
 
-        nt.getEntry(f"vision/{this_pi_name}/wpinow_time").setFloat(ntcore._now())  # https://www.chiefdelphi.com/t/synchronizing-cvsink-timestamp/
+        nt.getEntry(f"vision/{this_pi_name}/wpinow_time").setDouble(ntcore._now())  # https://www.chiefdelphi.com/t/synchronizing-cvsink-timestamp/
                                                                                    # basically we transmit this, then the robot figures out what wpi::Now() time
                                                                                    # is equivalent to its own time, then from there the robot can translate the apriltags'
                                                                                    # timestamps into its own time.

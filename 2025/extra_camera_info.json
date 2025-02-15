@@ -7,9 +7,9 @@
 		"cx": 320,
 		"cy": 180,
 		"transform": {
-			"x_meters": 0.3,
-			"y_meters": 0.15,
-			"z_meters": 0.2,
+			"x_meters": -0.3048,
+			"y_meters": -0.14605,
+			"z_meters": 0.23876,
 			"x_rot_degrees": 0,
 			"y_rot_degrees": 30,
 			"z_rot_degrees": 0
